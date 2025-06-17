@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -33,6 +34,31 @@ func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
 	})
 }
 
+func (cfg *apiConfig) handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
+	type msgValidate struct {
+		Body string
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	decoder := json.NewDecoder(r.Body)
+	msg := msgValidate{}
+	if err := decoder.Decode(&msg); err != nil {
+		log.Printf("Error decoding msgValidate: %s", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"error": "Something went wrong"}`))
+		return
+	}
+
+	if len(msg.Body) > 140 {
+		w.WriteHeader(400)
+		w.Write([]byte(`{"error": "Chirp is too long"}`))
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"valid": true}`))
+}
+
 func main() {
 	const filepathRoot = "."
 	const port = "8080"
@@ -43,6 +69,7 @@ func main() {
 	mux.HandleFunc("GET /admin/metrics", apiCfg.handlerMetrics)
 	mux.HandleFunc("POST /admin/reset", apiCfg.handlerReset)
 	mux.HandleFunc("GET /api/healthz", apiCfg.handlerReadiness)
+	mux.HandleFunc("POST /api/validate_chirp", apiCfg.handlerValidateChirp)
 
 	server := &http.Server{
 		Handler: mux,
