@@ -30,8 +30,16 @@ func (cfg *apiConfig) handlerChirpsValidate(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	badWords := map[string]struct{}{
+		"kerfuffle": {},
+		"sharbert":  {},
+		"fornax":    {},
+	}
+
+	cleaned := getCleanedBody(params.Body, badWords)
+
 	retVal := returnVals{
-		CleanedBody: replaceProfane(params.Body),
+		CleanedBody: cleaned,
 		Valid:       true,
 	}
 
@@ -39,11 +47,11 @@ func (cfg *apiConfig) handlerChirpsValidate(w http.ResponseWriter, r *http.Reque
 
 }
 
-func replaceProfane(body string) string {
-	profane := []string{"kerfuffle", "sharbert", "fornax"}
+func getCleanedBody(body string, badWords map[string]struct{}) string {
 	words := strings.Split(body, " ")
 	for i, word := range words {
-		if slices.Contains(profane, strings.ToLower(word)) {
+		loweredWord := strings.ToLower(word)
+		if _, ok := badWords[loweredWord]; ok {
 			words[i] = "****"
 		}
 	}
