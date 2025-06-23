@@ -16,9 +16,13 @@ type User struct {
 	Email     string    `json:"email"`
 }
 
-func (cfg *apiConfig) handlerUsersPost(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) handlerUsersCreate(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
 		Email string `json:"email"`
+	}
+
+	type response struct {
+		User
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -34,12 +38,12 @@ func (cfg *apiConfig) handlerUsersPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := User{
+	res := response{User{
 		ID:        u.ID,
 		CreatedAt: u.CreatedAt,
 		UpdatedAt: u.UpdatedAt,
 		Email:     u.Email,
-	}
+	}}
 
-	respondWithJSON(w, http.StatusCreated, user)
+	respondWithJSON(w, http.StatusCreated, res)
 }

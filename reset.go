@@ -13,13 +13,13 @@ func (cfg *apiConfig) handlerReset(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cfg.fileserverHits.Store(0)
-	rowsAffected, err := cfg.db.DeleteAllUsers(context.Background())
+	rowsAffected, err := cfg.db.Reset(context.Background())
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Coundn't delete all users", err)
 		return
 	}
 
-	log.Printf("%Deleted Users: d\n", rowsAffected)
+	log.Printf("Deleted Users: %d\n", rowsAffected)
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Hits reset to 0"))
