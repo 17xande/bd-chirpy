@@ -65,6 +65,20 @@ func (cfg *apiConfig) handlerChirpsCreate(w http.ResponseWriter, r *http.Request
 	respondWithJSON(w, http.StatusCreated, res)
 }
 
+func (cfg *apiConfig) handlerChirpsGet(w http.ResponseWriter, r *http.Request) {
+	type response struct {
+		Chirps []Chirp
+	}
+
+	chirps, err := cfg.db.GetChirps(context.Background())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Can't get all chirps", err)
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, chirps)
+}
+
 func (cfg *apiConfig) validateChirp(chirp string) (bool, string, error) {
 	const maxChirpLength = 140
 	if len(chirp) > maxChirpLength {
