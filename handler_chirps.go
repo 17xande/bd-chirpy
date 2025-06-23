@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/17xande/bd-chirpy/internal/database"
@@ -18,7 +20,7 @@ type Chirp struct {
 	UserID    uuid.UUID `json:"user_id"`
 }
 
-func (cfg *apiConfig) handlerChirpCreate(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) handlerChirpsCreate(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
 		Body   string    `json:"body"`
 		UserID uuid.UUID `json:"user_id"`
@@ -35,7 +37,7 @@ func (cfg *apiConfig) handlerChirpCreate(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	ok, cleanChirp, err := cfg.chirpsValidate(params.Body)
+	ok, cleanChirp, err := cfg.validateChirp(params.Body)
 	if !ok {
 		respondWithError(w, http.StatusUnprocessableEntity, "Can't valicate chirp", err)
 		return
@@ -61,4 +63,33 @@ func (cfg *apiConfig) handlerChirpCreate(w http.ResponseWriter, r *http.Request)
 	}}
 
 	respondWithJSON(w, http.StatusCreated, res)
+}
+
+func (cfg *apiConfig) validateChirp(chirp string) (bool, string, error) {
+	const maxChirpLength = 140
+	if len(chirp) > maxChirpLength {
+		return false, "", fmt.Errorf("chirp is too long")
+	}
+
+	badWords := map[string]struct{}{
+		"kerfuffle": {},
+		"sharbert":  {},
+		"fornax":    {},
+	}
+
+	cleaned := getCleanedBody(chirp, badWords)
+
+	return true, cleaned, nil
+}
+
+func getCleanedBody(body string, badWords map[string]struct{}) string {
+	words := strings.Split(body, " ")
+	for i, word := range words {
+		loweredWord := strings.ToLower(word)
+		if _, ok := badWords[loweredWord]; ok {
+			words[i] = "****"
+		}
+	}
+
+	return strings.Join(words, " ")
 }
