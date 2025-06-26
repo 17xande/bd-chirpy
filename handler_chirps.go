@@ -80,12 +80,7 @@ func (cfg *apiConfig) handlerChirpsGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (cfg *apiConfig) handlerChirpGet(w http.ResponseWriter, r *http.Request) {
-
 	id := r.PathValue("id")
-	if id == "" {
-		respondWithError(w, http.StatusUnprocessableEntity, "Please provide a chirp ID", nil)
-		return
-	}
 
 	uid, err := uuid.Parse(id)
 	if err != nil {
