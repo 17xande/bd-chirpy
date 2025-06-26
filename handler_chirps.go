@@ -79,6 +79,37 @@ func (cfg *apiConfig) handlerChirpsGet(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusOK, chirps)
 }
 
+func (cfg *apiConfig) handlerChirpGet(w http.ResponseWriter, r *http.Request) {
+
+	id := r.PathValue("id")
+	if id == "" {
+		respondWithError(w, http.StatusUnprocessableEntity, "Please provide a chirp ID", nil)
+		return
+	}
+
+	uid, err := uuid.Parse(id)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Can't parse ID: "+id, err)
+		return
+	}
+
+	chirp, err := cfg.db.GetChirp(context.Background(), uid)
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "Can't get chirp with this ID", err)
+		return
+	}
+
+	res := Chirp{
+		ID:        chirp.ID,
+		CreatedAt: chirp.CreatedAt,
+		UpdatedAt: chirp.UpdatedAt,
+		Body:      chirp.Body,
+		UserID:    chirp.UserID,
+	}
+
+	respondWithJSON(w, http.StatusOK, res)
+}
+
 func (cfg *apiConfig) validateChirp(chirp string) (bool, string, error) {
 	const maxChirpLength = 140
 	if len(chirp) > maxChirpLength {
