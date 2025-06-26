@@ -1,4 +1,4 @@
--- +goose UP
+-- +goose Up
 create table users (
   id uuid,
   created_at timestamp not null,
