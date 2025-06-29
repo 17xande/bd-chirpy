@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/17xande/bd-chirpy/internal/auth"
+	"github.com/17xande/bd-chirpy/internal/database"
 	"github.com/google/uuid"
 )
 
@@ -19,7 +20,8 @@ type User struct {
 
 func (cfg *apiConfig) handlerUsersCreate(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-		Email string `json:"email"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
 
 	type response struct {
@@ -33,7 +35,18 @@ func (cfg *apiConfig) handlerUsersCreate(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	u, err := cfg.db.CreateUser(context.Background(), params.Email)
+	hash, err := auth.HashPassword(params.Password)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Error hashing password", nil)
+		return
+	}
+
+	userParams := database.CreateUserParams{
+		Email:          params.Email,
+		HashedPassword: hash,
+	}
+
+	u, err := cfg.db.CreateUser(context.Background(), userParams)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Error creating user", err)
 		return
@@ -66,19 +79,13 @@ func (cfg *apiConfig) handlerUserLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hash, err := auth.HashPassword(params.Password)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Error hashing password for comparison", err)
-		return
-	}
-
 	user, err := cfg.db.GetUserByEmail(context.Background(), params.Email)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Error getting user by email", err)
+		respondWithError(w, http.StatusUnauthorized, "Error getting user by email", err)
 		return
 	}
 
-	if err := auth.CheckPasswordHash(hash, user.HashedPassword); err != nil {
+	if err := auth.CheckPasswordHash(params.Password, user.HashedPassword); err != nil {
 		respondWithError(w, http.StatusUnauthorized, "Incorrect email or password", err)
 	}
 
