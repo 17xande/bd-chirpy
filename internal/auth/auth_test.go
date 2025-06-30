@@ -1,11 +1,9 @@
 package auth
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
 
@@ -66,7 +64,7 @@ func TestCheckPasswordHash(t *testing.T) {
 func TestJWTCreation(t *testing.T) {
 	id1, _ := uuid.Parse("b8b69eb9-4fc8-4dcb-9d15-4978cbde44aa")
 	secret1 := "secret1"
-	expires1, _ := time.ParseDuration("30min")
+	expires1, _ := time.ParseDuration("24h")
 
 	tests := []struct {
 		name    string
