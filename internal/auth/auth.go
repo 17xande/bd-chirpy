@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -8,6 +9,10 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
+
+type TokenType string
+
+const TokenTypeAccess TokenType = "chirpy-access"
 
 func HashPassword(password string) (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -20,19 +25,15 @@ func CheckPasswordHash(password, hash string) error {
 }
 
 func MakeJWT(userID uuid.UUID, tokenSecret string, expiresIn time.Duration) (string, error) {
+	signinKey := []byte(tokenSecret)
 	claims := jwt.RegisteredClaims{
-		Issuer:    "chirpy",
+		Issuer:    string(TokenTypeAccess),
 		IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
 		ExpiresAt: jwt.NewNumericDate(time.Now().UTC().Add(expiresIn)),
 		Subject:   userID.String(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	strTok, err := token.SignedString([]byte(tokenSecret))
-	if err != nil {
-		return "", fmt.Errorf("can't sign token: %w", err)
-	}
-
-	return strTok, nil
+	return token.SignedString(signinKey)
 }
 
 func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
@@ -44,12 +45,21 @@ func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
 		return uuid.Nil, fmt.Errorf("can't parse jwt token: %w", err)
 	}
 
-	parsedClaims, ok := token.Claims.(*jwt.RegisteredClaims)
-	if !ok {
-		return uuid.Nil, fmt.Errorf("claim invalid")
+	userIDString, err := token.Claims.GetSubject()
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("can't get claim subject: %w", err)
 	}
 
-	id, err := uuid.Parse(parsedClaims.Subject)
+	issuer, err := token.Claims.GetIssuer()
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("can't get claim issuer: %w", err)
+	}
+
+	if issuer != string(TokenTypeAccess) {
+		return uuid.Nil, errors.New("invalid issuer")
+	}
+
+	id, err := uuid.Parse(userIDString)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("can't parse uuid from jwt: %w", err)
 	}
