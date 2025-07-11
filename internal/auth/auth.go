@@ -13,6 +13,8 @@ import (
 
 type TokenType string
 
+var ErrNoAuthHeaderIncluded = errors.New("no auth header included in request")
+
 const TokenTypeAccess TokenType = "chirpy-access"
 
 func HashPassword(password string) (string, error) {
@@ -71,7 +73,7 @@ func GetBearerToken(headers http.Header) (string, error) {
 	token := headers.Get("Authorization")
 	strip := "Bearer "
 	if token == "" {
-		return "", errors.New("No authorization header")
+		return "", ErrNoAuthHeaderIncluded
 	}
 	if len(token) <= len(strip) || token[0:len(strip)] != strip {
 		return "", fmt.Errorf("Invalid authorization header: %v", token)
