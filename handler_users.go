@@ -65,13 +65,13 @@ func (cfg *apiConfig) handlerUsersCreate(w http.ResponseWriter, r *http.Request)
 
 func (cfg *apiConfig) handlerUserLogin(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-		Password         string `json:"password"`
-		Email            string `json:"email"`
-		ExpiresInSeconds int    `json:"expires_in_seconds"`
+		Password string `json:"password"`
+		Email    string `json:"email"`
 	}
 
 	type response struct {
 		User
+		RefreshToken string `json:"refresh_token"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -79,12 +79,6 @@ func (cfg *apiConfig) handlerUserLogin(w http.ResponseWriter, r *http.Request) {
 	if err := decoder.Decode(&params); err != nil {
 		respondWithError(w, http.StatusUnprocessableEntity, "Couldn't decode parameters", err)
 		return
-	}
-
-	expires := time.Hour
-
-	if params.ExpiresInSeconds > 0 && params.ExpiresInSeconds < 60*60 {
-		expires = time.Duration(params.ExpiresInSeconds) * time.Second
 	}
 
 	user, err := cfg.db.GetUserByEmail(context.Background(), params.Email)
@@ -97,18 +91,44 @@ func (cfg *apiConfig) handlerUserLogin(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusUnauthorized, "Incorrect email or password", err)
 	}
 
+	expires := time.Hour
+
 	token, err := auth.MakeJWT(user.ID, cfg.secret, expires)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Error generating JWT", err)
 	}
 
-	res := response{User{
-		ID:        user.ID,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-		Email:     user.Email,
-		Token:     token,
-	}}
+	refreshToken, err := auth.MakeRefreshToken()
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Error generating refreshToken", err)
+	}
+
+	args := database.CreateRefreshTokenParams{
+		Token:     refreshToken,
+		UserID:    user.ID,
+		ExpiresAt: time.Now().Add(time.Hour * 24 * 60),
+	}
+
+	_, err = cfg.db.CreateRefreshToken(context.Background(), args)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Error storing refreshToken in db", err)
+	}
+
+	res := response{
+		User: User{
+			ID:        user.ID,
+			CreatedAt: user.CreatedAt,
+			UpdatedAt: user.UpdatedAt,
+			Email:     user.Email,
+			Token:     token,
+		},
+
+		RefreshToken: refreshToken,
+	}
 
 	respondWithJSON(w, http.StatusOK, res)
+}
+
+func (cfg *apiConfig) handlerGetRefreshToken(w http.ResponseWriter, r *http.Request) {
+	token, err := auth.GetBearerToken(r.Header)
 }
