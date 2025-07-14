@@ -6,13 +6,12 @@ values (
   now(),
   $2,
   $3,
-  null
 )
 returning *;
 
 -- name: GetUserFromRefreshToken :one
-select * from refresh_tokens
-join users on users.id = refresh_tokens.user_id
+select *
+from refresh_tokens
 where refresh_tokens.token = $1;
 
 -- name: RevokeRefreshToken :one

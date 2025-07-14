@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
@@ -106,7 +108,7 @@ func (cfg *apiConfig) handlerUserLogin(w http.ResponseWriter, r *http.Request) {
 	args := database.CreateRefreshTokenParams{
 		Token:     refreshToken,
 		UserID:    user.ID,
-		ExpiresAt: time.Now().Add(time.Hour * 24 * 60),
+		ExpiresAt: time.Now().UTC().Add(time.Hour * 24 * 60),
 	}
 
 	_, err = cfg.db.CreateRefreshToken(context.Background(), args)
@@ -130,5 +132,55 @@ func (cfg *apiConfig) handlerUserLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (cfg *apiConfig) handlerGetRefreshToken(w http.ResponseWriter, r *http.Request) {
-	token, err := auth.GetBearerToken(r.Header)
+	refreshToken, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Couldn't get token", err)
+		return
+	}
+
+	token, err := cfg.db.GetUserFromRefreshToken(context.Background(), refreshToken)
+	if errors.Is(err, sql.ErrNoRows) {
+		respondWithError(w, http.StatusUnauthorized, "Token doesn't exist", err)
+		return
+	}
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Error trying to get token from database", err)
+		return
+	}
+	if token.ExpiresAt.Before(time.Now().UTC()) {
+		respondWithError(w, http.StatusUnauthorized, "Token expired", nil)
+		return
+	}
+
+	if token.RevokedAt.Valid {
+		respondWithError(w, http.StatusUnauthorized, "Token revoked", nil)
+		return
+	}
+
+	newToken, err := auth.MakeJWT(token.UserID, cfg.secret, time.Hour)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Can't create new access token from refresh token", err)
+		return
+	}
+
+	type response struct {
+		Token string `json:"token"`
+	}
+	respondWithJSON(w, http.StatusOK, response{Token: newToken})
+}
+
+func (cfg *apiConfig) handlerRevokeToken(w http.ResponseWriter, r *http.Request) {
+	refreshToken, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Couldn't get token", err)
+		return
+	}
+
+	_, err = cfg.db.RevokeRefreshToken(context.Background(), refreshToken)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Error trying to revoke token in database", err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
