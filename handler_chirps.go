@@ -161,3 +161,44 @@ func getCleanedBody(body string, badWords map[string]struct{}) string {
 
 	return strings.Join(words, " ")
 }
+
+func (cfg *apiConfig) handlerChirpDelete(w http.ResponseWriter, r *http.Request) {
+	chirpId := r.PathValue("id")
+
+	uid, err := uuid.Parse(chirpId)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Can't parse ID: "+chirpId, err)
+		return
+	}
+
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Couldn't get token", err)
+		return
+	}
+
+	user_id, err := auth.ValidateJWT(token, cfg.secret)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Couldn't get user ID from token", err)
+		return
+	}
+
+	_, err = cfg.db.GetChirp(context.Background(), uid)
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "Can't get chirp with this ID", err)
+		return
+	}
+
+	args := database.DeleteChirpParams{
+		ID:     uid,
+		UserID: user_id,
+	}
+
+	rows, err := cfg.db.DeleteChirp(context.Background(), args)
+	if err != nil || rows != 1 {
+		respondWithError(w, http.StatusForbidden, "Couldn't delete this chirp", err)
+		return
+	}
+
+	respondWithJSON(w, http.StatusNoContent, nil)
+}

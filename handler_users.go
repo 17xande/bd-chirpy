@@ -65,6 +65,70 @@ func (cfg *apiConfig) handlerUsersCreate(w http.ResponseWriter, r *http.Request)
 	respondWithJSON(w, http.StatusCreated, res)
 }
 
+func (cfg *apiConfig) handlerUsersUpdate(w http.ResponseWriter, r *http.Request) {
+	type parameters struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	type response struct {
+		User
+		RefreshToken string `json:"refresh_token"`
+	}
+
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Couldn't get token", err)
+		return
+	}
+
+	ID, err := auth.ValidateJWT(token, cfg.secret)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Couldn't get user ID from token", err)
+		return
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	params := parameters{}
+	if err := decoder.Decode(&params); err != nil {
+		respondWithError(w, http.StatusUnprocessableEntity, "Coundn't decode parameters", err)
+		return
+	}
+
+	hash, err := auth.HashPassword(params.Password)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Error hashing password", nil)
+		return
+	}
+
+	userParams := database.UpdateUserParams{
+		ID:             ID,
+		Email:          params.Email,
+		HashedPassword: hash,
+	}
+
+	user, err := cfg.db.UpdateUser(context.Background(), userParams)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Error updating user in database", err)
+		return
+	}
+
+	res := response{
+		User: User{
+			ID:        user.ID,
+			CreatedAt: user.CreatedAt,
+			UpdatedAt: user.UpdatedAt,
+			Email:     user.Email,
+			Token:     token,
+		},
+
+		// RefreshToken: refreshToken,
+	}
+
+	respondWithJSON(w, http.StatusOK, res)
+
+}
+
 func (cfg *apiConfig) handlerUserLogin(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
 		Password string `json:"password"`

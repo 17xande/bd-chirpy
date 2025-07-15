@@ -13,14 +13,13 @@ import (
 )
 
 const createRefreshToken = `-- name: CreateRefreshToken :one
-insert into refresh_tokens(token, created_at, updated_at, user_id, expires_at, revoked_at)
+insert into refresh_tokens(token, created_at, updated_at, user_id, expires_at)
 values (
   $1,
   now(),
   now(),
   $2,
-  $3,
-  null
+  $3
 )
 returning token, created_at, updated_at, user_id, expires_at, revoked_at
 `

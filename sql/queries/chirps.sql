@@ -10,3 +10,7 @@ order by created_at;
 -- name: GetChirp :one
 select * from chirps
 where id = $1;
+
+-- name: DeleteChirp :execrows
+delete from chirps
+where id = $1 and user_id = $2;
