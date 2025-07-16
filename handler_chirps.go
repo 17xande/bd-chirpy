@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -85,10 +86,35 @@ func (cfg *apiConfig) handlerChirpsGet(w http.ResponseWriter, r *http.Request) {
 		Chirps []Chirp
 	}
 
-	chirps, err := cfg.db.GetChirps(context.Background())
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Can't get all chirps", err)
-		return
+	queryParams := r.URL.Query()
+	author_id := queryParams.Get("author_id")
+	sortParam := queryParams.Get("sort")
+	if sortParam == "" {
+		sortParam = "asc"
+	}
+	var chirps []database.Chirp
+	if author_id == "" {
+		var err error
+		chirps, err = cfg.db.GetChirps(context.Background())
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Can't get all chirps", err)
+			return
+		}
+	} else {
+		uid, err := uuid.Parse(author_id)
+		if err != nil {
+			respondWithError(w, http.StatusUnprocessableEntity, "Invalid author_id", err)
+			return
+		}
+		chirps, err = cfg.db.GetChirpsByAuthor(context.Background(), uid)
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Can't get chirps for this user", err)
+			return
+		}
+	}
+
+	if sortParam == "desc" {
+		sort.Slice(chirps, func(i, j int) bool { return chirps[i].CreatedAt.After(chirps[j].CreatedAt) })
 	}
 
 	resChirps := []Chirp{}

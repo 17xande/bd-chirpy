@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -90,4 +91,16 @@ func MakeRefreshToken() (string, error) {
 	token := hex.EncodeToString(key)
 
 	return token, err
+}
+
+func GetAPIKey(headers http.Header) (string, error) {
+	head := headers.Get("Authorization")
+	if head == "" {
+		return "", ErrNoAuthHeaderIncluded
+	}
+	split := strings.Split(head, " ")
+	if len(split) != 2 {
+		return "", fmt.Errorf("Invalid authorization header: %v", head)
+	}
+	return split[1], nil
 }
